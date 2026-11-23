@@ -191,7 +191,7 @@ nav{flex:0 0 auto;height:calc(44px + min(env(safe-area-inset-bottom),14px));padd
       <div class="row"><input class="inp" id="codeName" placeholder="نام صحنه"></div>
       <div class="row"><textarea class="inp" id="codeText" placeholder="&lt;!DOCTYPE html&gt; … کد HTML / Three.js را اینجا جاگذاری کنید"></textarea></div>
       <div class="row"><button class="btn grad" id="codeRun">اجرا و ذخیره</button><button class="btn" id="codeTemplate">کد صحنه‌ی فعلی</button></div>
-      <div class="hint">صحنه‌ها در همین مرورگر ذخیره می‌شوند. صحنه‌ای که «CARIZMA SCENE RUNTIME» را داشته باشد، پنل‌ها، ثبت زاویه، حرکت دوربین و محافظ دیوار را کامل دارد. صحنه‌ی Three.js معمولی فقط نمایش و خروجی تصویر دارد.</div>
+      <div class="hint">صحنه‌ها در همین مرورگر ذخیره می‌شوند. اگر نسخه‌ی جدیدِ صحنه‌ای را وارد کنید که قبلاً وارد شده (همان شناسه‌ی داخلی)، خودکار جایگزین نسخه‌ی قبلی می‌شود و زاویه‌های ثبت‌شده حفظ می‌شوند. صحنه‌ای که «CARIZMA SCENE RUNTIME» را داشته باشد، پنل‌ها، ثبت زاویه، حرکت دوربین و محافظ دیوار را کامل دارد. صحنه‌ی Three.js معمولی فقط نمایش و خروجی تصویر دارد.</div>
     </section>
 
     <div id="toast" class="glass"></div>
@@ -543,6 +543,37 @@ function plasterTexture(base){
   const t=new T.CanvasTexture(c);t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(3,2);t.encoding=T.sRGBEncoding;return t;
 }
 
+
+/* 2 kg household dial: 0 at 6 o'clock, clockwise, 1 kg (red triangle) at 12. Persian numerals, grams. */
+function dialTexture(){
+  const S=1024,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d');
+  const C=S/2,R=S/2-6;
+  x.fillStyle='#f7f3ea';x.beginPath();x.arc(C,C,R,0,Math.PI*2);x.fill();
+  x.strokeStyle='#2a2420';x.lineWidth=10;x.beginPath();x.arc(C,C,R-6,0,Math.PI*2);x.stroke();
+  const fa=n=>String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+  const ang=g=>((g-1000)/2000)*Math.PI*2-Math.PI/2;           // canvas angle, 1000 g at the top
+  for(let g=0;g<2000;g+=10){
+    const a=ang(g),major=g%100===0,mid=g%50===0;
+    const r1=R-22,r0=major?R-86:(mid?R-62:R-44);
+    x.strokeStyle=(g>=1000&&g<1000+1)?'#c8141c':'#1d1916';x.lineWidth=major?7:(mid?4.5:2.5);
+    x.beginPath();x.moveTo(C+Math.cos(a)*r0,C+Math.sin(a)*r0);x.lineTo(C+Math.cos(a)*r1,C+Math.sin(a)*r1);x.stroke();
+  }
+  x.fillStyle='#1d1916';x.textAlign='center';x.textBaseline='middle';
+  for(let g=0;g<2000;g+=200){
+    if(g===1000) continue;
+    const a=ang(g),r=R-150;
+    x.font='bold 64px Tahoma,"DejaVu Sans",Arial,sans-serif';
+    x.fillText(fa(g),C+Math.cos(a)*r,C+Math.sin(a)*r);
+  }
+  // 1 kg: red triangle at 12 o'clock + label
+  x.fillStyle='#c8141c';x.beginPath();x.moveTo(C,C-R+24);x.lineTo(C-34,C-R+94);x.lineTo(C+34,C-R+94);x.closePath();x.fill();
+  x.font='bold 60px Tahoma,"DejaVu Sans",Arial,sans-serif';x.fillText('۱ کیلو',C,C-R+165);
+  // red 1 kg sector band on the rim (±25 g)
+  x.strokeStyle='rgba(200,20,28,0.85)';x.lineWidth=16;x.beginPath();x.arc(C,C,R-30,ang(975),ang(1025));x.stroke();
+  x.fillStyle='#3a332d';x.font='bold 44px Tahoma,"DejaVu Sans",Arial,sans-serif';x.fillText('گرم',C,C+R*0.36);
+  x.font='bold 34px Tahoma,"DejaVu Sans",Arial,sans-serif';x.fillText('حداکثر ۲ کیلو',C,C+R*0.48);
+  const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=8;return t;
+}
 /* ---------------- ROOM ---------------- */
 const RW=5.2, RD=6.0, RH=3.0;        // x: -2.6..2.6, z: -3..3
 const DOOR={x:0,halfW:0.6,h:2.2,z:3.0};
@@ -670,11 +701,10 @@ function buildProps(ctx){
   cyl(0.022,0.022,0.33,brass,-0.03,0.2,0,sc,12);
   const dial=new T.Group();dial.position.set(0.0,0.2,0);sc.add(dial);
   const rim=cyl(0.115,0.115,0.05,brass,0,0,0,dial,40);rim.rotation.z=Math.PI/2;
-  const face=new T.Mesh(new T.CircleGeometry(0.1,48),mat('#f5f2ea',{roughness:0.5}));face.rotation.y=Math.PI/2;face.position.x=0.026;dial.add(face);
-  const tri=new T.Shape();tri.moveTo(0,0.085);tri.lineTo(-0.014,0.06);tri.lineTo(0.014,0.06);tri.lineTo(0,0.085);
-  const triM=new T.Mesh(new T.ShapeGeometry(tri),new T.MeshBasicMaterial({color:'#d0281e'}));triM.rotation.y=Math.PI/2;triM.position.x=0.027;dial.add(triM);
+  const face=new T.Mesh(new T.CircleGeometry(0.1,64),mat('#ffffff',{roughness:0.45,map:dialTexture()}));face.rotation.y=Math.PI/2;face.position.x=0.026;dial.add(face);
+  const glass=new T.Mesh(new T.CircleGeometry(0.1,48),new T.MeshStandardMaterial({color:'#ffffff',transparent:true,opacity:0.07,roughness:0.05,metalness:0.2}));glass.rotation.y=Math.PI/2;glass.position.x=0.036;dial.add(glass);
   const nPivot=new T.Group();nPivot.position.x=0.03;dial.add(nPivot);G.needle=nPivot;
-  const nd=box(0.004,0.08,0.006,mat('#111111'),0,0.035,0,nPivot);
+  const nd=box(0.0035,0.084,0.006,mat('#b3121a'),0,0.036,0,nPivot);box(0.004,0.022,0.006,mat('#111111'),0,-0.011,0,nPivot);
   sph(0.008,mat('#111111'),0,0,0,nPivot);
   const pan=cyl(0.15,0.13,0.02,brass,-0.03,0.38,0,sc,40);
   G.panTopY=COUNTER.h+0.39;
@@ -728,7 +758,7 @@ function buildAsghar(ctx){
   // head
   const head=new T.Group();head.position.y=0.86;torso.add(head);G.head=head;
   sph(0.17,skin,0,0,0,head,1,1.06,1);
-  sph(0.17,black,0,0.02,-0.035,head,1.02,1.0,0.92).scale.multiplyScalar(1);    // hair (back)
+  sph(0.168,black,0,-0.005,-0.035,head,1.02,0.95,0.92);    // hair (back)
   const hairCut=sph(0.172,skin,0,-0.01,0.045,head,0.98,1.0,0.9);               // face shell over hair front
   [-1,1].forEach(s=>{sph(0.03,skin,0.168*s,0,0,head,0.6,1,1);});              // ears
   [-1,1].forEach(s=>{sph(0.02,black,0.06*s,0.035,0.15,head);});                // eyes
@@ -761,22 +791,22 @@ function buildAsghar(ctx){
 /* ---------------- POSES (per panel) ---------------- */
 // root: x,z,rotY | lean | head yaw/pitch | arm: [shoulder pitch(+fwd), shoulder out, elbow bend(+)] | stride
 const POSES={
-  P1:{x:-2.12,z:1.0,ry:Math.PI/2,lean:0.06,hy:-0.12,hp:0.22,R:[0.55,0.18,1.55],L:[0.55,0.18,1.55],stride:0,brow:0,anger:0},   // arms folded, suspicious glance down at basket
-  P2:{x:-2.12,z:1.0,ry:Math.PI/2,lean:0.04,hy:0.18,hp:0.05,R:[1.3,0.05,1.0],L:[0.35,0.1,0.35],stride:0,brow:0.1,anger:0.1}, // butter raised in the right palm
-  P3:{x:-2.12,z:1.05,ry:Math.PI/2,lean:0.14,hy:0.42,hp:0.32,R:[0.95,0.55,0.55],L:[0.35,0.1,0.35],stride:0,brow:0.15,anger:0.15}, // sets it on the pan
-  P4:{x:-2.12,z:1.05,ry:Math.PI/2,lean:0.18,hy:0.45,hp:0.4,R:[0.6,0.35,0.9],L:[0.35,0.1,0.35],stride:0,brow:0.3,anger:0.3},   // stares at the dial
-  P5:{x:-2.12,z:1.0,ry:Math.PI/2,lean:0.16,hy:0.0,hp:-0.05,R:[0.75,0.05,0.35],L:[0.3,0.12,0.3],stride:0,brow:1,anger:1},     // fist slammed on the counter
+  P1:{x:-2.12,z:1.0,ry:Math.PI/2,lean:0.12,hy:-0.12,hp:0.26,R:[0.55,0.1,0.5],L:[0.55,0.1,0.5],stride:0,brow:0.15,anger:0},    // both palms on the counter edge, leaning in, suspicious glance at the basket
+  P2:{x:-2.12,z:1.0,ry:Math.PI/2,lean:0.04,hy:0.18,hp:0.05,R:[1.3,0.05,1.0],L:[0.55,0.1,0.5],stride:0,brow:0.1,anger:0.1}, // butter raised in the right palm
+  P3:{x:-2.12,z:1.05,ry:Math.PI/2,lean:0.14,hy:0.42,hp:0.32,R:[0.95,0.55,0.55],L:[0.55,0.1,0.45],stride:0,brow:0.15,anger:0.15}, // sets it on the pan
+  P4:{x:-2.12,z:1.05,ry:Math.PI/2,lean:0.18,hy:0.45,hp:0.4,R:[0.55,0.1,0.42],L:[0.55,0.1,0.42],stride:0,brow:0.3,anger:0.3},   // stares at the dial
+  P5:{x:-2.12,z:1.0,ry:Math.PI/2,lean:0.16,hy:0.0,hp:-0.05,R:[0.75,0.05,0.35],L:[0.55,0.1,0.45],stride:0,brow:1,anger:1},     // fist slammed on the counter
   P6:{x:-0.9,z:2.3,ry:0.95,lean:0.12,hy:0.0,hp:0.0,R:[-0.35,0.08,0.55],L:[0.4,0.08,0.4],stride:0.42,brow:1,anger:1}          // storming to the door
 };
 const STATES={
-  P1:{pose:'P1',inBasket:3,onPan:false,inHand:false,needle:90,puff:0},
-  P2:{pose:'P2',inBasket:2,onPan:false,inHand:true,needle:90,puff:0},
-  P3:{pose:'P3',inBasket:2,onPan:true,inHand:false,needle:24,puff:0},
-  P4:{pose:'P4',inBasket:2,onPan:true,inHand:false,needle:20,puff:0},
-  P5:{pose:'P5',inBasket:2,onPan:true,inHand:false,needle:20,puff:1},
-  P6:{pose:'P6',inBasket:2,onPan:true,inHand:false,needle:20,puff:0.25}
+  P1:{pose:'P1',inBasket:3,onPan:false,inHand:false,needle:0,puff:0},
+  P2:{pose:'P2',inBasket:2,onPan:false,inHand:true,needle:0,puff:0},
+  P3:{pose:'P3',inBasket:2,onPan:true,inHand:false,needle:935,puff:0},
+  P4:{pose:'P4',inBasket:2,onPan:true,inHand:false,needle:920,puff:0},
+  P5:{pose:'P5',inBasket:2,onPan:true,inHand:false,needle:920,puff:1},
+  P6:{pose:'P6',inBasket:2,onPan:true,inHand:false,needle:920,puff:0.25}
 };
-let live={needle:90,tremble:0,puff:0,puffT:0};
+let live={needle:0,tremble:0,puff:0,puffT:0};
 
 function blendPose(a,b,e){
   if(!b) return a;
@@ -847,8 +877,8 @@ window.CARIZMA_SCENE={
   applyPose(sa,sb,e){applyState(sa,sb,e);},
   tick(dt,t){
     // needle settles with a tiny tremble (never perfectly still)
-    const nd=live.needle+(live.tremble?Math.sin(t*23)*0.6:0);
-    G.needle.rotation.x=nd*Math.PI/180;
+    const g=live.needle+(live.tremble?Math.sin(t*23)*3:0);
+    G.needle.rotation.x=-((g-1000)/2000*360)*Math.PI/180;
     // oven mouth flicker
     G.ovenLight.intensity=2.1+Math.sin(t*9)*0.12+Math.sin(t*23)*0.06;
     // flour puff around the fist
@@ -923,10 +953,13 @@ function patchCode(code){
 }
 function builtinCode(){return document.getElementById('builtin-scene').textContent.replace(/<\\\/script>/g,'</'+'script>');}
 function userScenes(){return LS.get(K_SCENES,[]);}
-function allScenes(){return [BUILTIN].concat(userScenes());}
+const BUILTIN_KEY='bakery_s2';
+// the scene's own id inside the code: window.CARIZMA_SCENE = { id:'...' }
+function sceneKey(code){const m=/CARIZMA_SCENE\s*=\s*\{[\s\S]{0,400}?\bid\s*:\s*['"]([^'"]+)['"]/.exec(code||'');return m?m[1]:null;}
+function allScenes(){const us=userScenes();const hideBuiltin=us.some(x=>x.key===BUILTIN_KEY);return (hideBuiltin?[]:[BUILTIN]).concat(us);}
 let blobUrl=null;
 function loadScene(id){
-  const sc=allScenes().find(s=>s.id===id)||BUILTIN;
+  const sc=allScenes().find(s=>s.id===id)||allScenes()[0]||BUILTIN;
   LS.set(K_ACTIVE,sc.id);
   const code=sc.builtin?builtinCode():sc.code;
   presets=[];curPreset=null;hasRuntime=false;renderStrip();
@@ -1089,7 +1122,7 @@ function renderScenes(){
   const L=$('#sceneList');L.innerHTML='';const act=LS.get(K_ACTIVE,BUILTIN.id);
   allScenes().forEach(sc=>{
     const d=document.createElement('div');d.className='sc'+(sc.id===act?' on':'');
-    d.innerHTML=`<span class="nm">${esc(sc.name)}${sc.builtin?' <span class="hint">(پیش‌فرض)</span>':''}</span><button class="btn" data-a="run">اجرا</button>${sc.builtin?'':'<button class="btn dang" data-a="del">حذف</button>'}`;
+    d.innerHTML=`<span class="nm">${esc(sc.name)}${sc.builtin?' <span class="hint">(پیش‌فرض)</span>':''}${sc.key===BUILTIN_KEY?' <span class="hint">(جایگزین پیش‌فرض)</span>':''}</span><button class="btn" data-a="run">اجرا</button>${sc.builtin?'':'<button class="btn dang" data-a="del">حذف</button>'}`;
     d.querySelector('[data-a=run]').onclick=()=>{loadScene(sc.id);closeSheets();};
     const del=d.querySelector('[data-a=del]');if(del)del.onclick=()=>{if(!confirm('صحنه‌ی «'+sc.name+'» حذف شود؟'))return;LS.set(K_SCENES,userScenes().filter(s=>s.id!==sc.id));if(act===sc.id)loadScene(BUILTIN.id);else renderScenes();};
     L.appendChild(d);
@@ -1097,9 +1130,19 @@ function renderScenes(){
 }
 function addScene(name,code){
   if(!code||code.trim().length<20){toast('کد خالی است');return;}
-  const sc={id:'s'+Date.now().toString(36),name:name||('صحنه '+(userScenes().length+1)),code};
-  const list=userScenes();list.push(sc);LS.set(K_SCENES,list);loadScene(sc.id);closeSheets();toast('صحنه اجرا و ذخیره شد');
+  const key=sceneKey(code), list=userScenes();
+  // same scene (same internal id, or same name when there is no id) -> replace it in place
+  const i=list.findIndex(x=>(key&&x.key===key)||(!key&&!x.key&&name&&x.name===name));
+  if(i>=0){
+    list[i]=Object.assign({},list[i],{code,key,name:name||list[i].name,updated:Date.now()});
+    LS.set(K_SCENES,list);loadScene(list[i].id);closeSheets();toast('نسخه‌ی جدید جایگزین شد: '+list[i].name);return;
+  }
+  const sc={id:'s'+Date.now().toString(36),key,name:name||('صحنه '+(list.length+1)),code,updated:Date.now()};
+  list.push(sc);LS.set(K_SCENES,list);loadScene(sc.id);closeSheets();
+  toast(key===BUILTIN_KEY?'جایگزین صحنه‌ی پیش‌فرض شد':'صحنه اجرا و ذخیره شد');
 }
+// one-time migration: tag scenes saved before this version with their internal id
+(function(){const l=userScenes();let ch=false;l.forEach(x=>{if(x.key===undefined){x.key=sceneKey(x.code);ch=true;}});if(ch)LS.set(K_SCENES,l);})();
 $('#upHtml').onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>addScene($('#codeName').value.trim()||f.name.replace(/\.\w+$/,''),fr.result);fr.readAsText(f);e.target.value='';};
 $('#codeRun').onclick=()=>addScene($('#codeName').value.trim(),$('#codeText').value);
 $('#codeTemplate').onclick=()=>{const act=LS.get(K_ACTIVE,BUILTIN.id);const sc=allScenes().find(s=>s.id===act)||BUILTIN;$('#codeText').value=sc.builtin?builtinCode():sc.code;$('#codeName').value=(sc.name||'')+' (کپی)';};
